@@ -1,0 +1,17 @@
+{
+  "name": "markdown-table-validator",
+  "version": "0.0.0",
+  "description": "Validate Markdown tables for shape, alignment and predictable rendering.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edilec/markdown-table-validator"
+  }
+}
