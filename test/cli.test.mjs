@@ -101,6 +101,22 @@ test('the preview is a derived copy that preserves every cell, and the input is 
   }
 })
 
+test('the preview refuses to write over the input it was derived from', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    const path = join(directory, 'doc.md')
+    const source = ['| a | b |', '| - | - |', '| 1 | 2 |', ''].join('\n')
+    await writeFile(path, source, 'utf8')
+    const result = await cli(['--root', directory, '--preview-dir', directory, path])
+    assert.equal(result.code, 2)
+    assert.equal(result.stdout, '')
+    assert.match(result.stderr, /Refusing to overwrite the input file doc\.md/)
+    assert.equal(await readFile(path, 'utf8'), source)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('an unreadable input is incomplete and exits 2', async () => {
   const result = await cli(['--json', 'examples/does-not-exist.md'])
   assert.equal(result.code, 2)

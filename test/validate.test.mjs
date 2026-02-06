@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import {
+  LimitExceeded,
   RULES,
   parseConfig,
+  readDocuments,
   renderDocumentPreview,
   parseTables,
   validateDocuments,
@@ -180,6 +185,23 @@ test('exceeding a limit is an explicit finding, never a silent truncation', () =
   assert.match(report.findings[0].message, /maxRowsPerTable limit of 1/)
 })
 
+test('every declared bound is enforced and named', () => {
+  const table = ['| a | b |', '| - | - |', '| 1 | 2 |']
+  const cases = [
+    { limits: { maxLines: 2 }, text: table.join('\n'), limit: 'maxLines' },
+    { limits: { maxLineLength: 5 }, text: table.join('\n'), limit: 'maxLineLength' },
+    { limits: { maxColumns: 1 }, text: table.join('\n'), limit: 'maxColumns' },
+    { limits: { maxRowsPerTable: 1 }, text: [...table, '| 3 | 4 |'].join('\n'), limit: 'maxRowsPerTable' },
+    { limits: { maxTables: 1 }, text: [...table, '', ...table].join('\n'), limit: 'maxTables' },
+  ]
+  for (const example of cases) {
+    const { report } = run(example.text, { limits: example.limits })
+    assert.equal(report.status, 'incomplete', example.limit)
+    assert.deepEqual(report.findings.map((item) => item.ruleId), ['limit-exceeded'], example.limit)
+    assert.ok(report.findings[0].message.startsWith(`The ${example.limit} limit of`), report.findings[0].message)
+  }
+})
+
 test('the injected clock bounds how long a document may take', () => {
   let ticks = 0
   const clock = () => {
@@ -193,6 +215,54 @@ test('the injected clock bounds how long a document may take', () => {
   assert.equal(report.status, 'incomplete')
   assert.equal(report.findings[0].ruleId, 'limit-exceeded')
   assert.match(report.findings[0].message, /timeLimitMs/)
+})
+
+test('evidence escapes control characters instead of printing them', () => {
+  const control = String.fromCharCode(0x7f)
+  const backslash = String.fromCharCode(92)
+  const { report } = run([
+    '| a | b |',
+    '| - | - |',
+    `| 1${control} | 2 | 3 |`,
+  ].join('\n'))
+  const mismatch = report.findings.find((item) => item.ruleId === 'column-count-mismatch')
+  assert.equal(mismatch.evidence, `| 1${backslash}u007f | 2 | 3 |`)
+  assert.ok(!mismatch.evidence.includes(control))
+  assert.ok(report.findings.every((item) => item.evidence === undefined || !item.evidence.includes(control)))
+})
+
+test('reading names each input failure without ever walking a directory', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    await writeFile(join(directory, 'big.md'), '| a | b |\n| - | - |\n', 'utf8')
+    await writeFile(join(directory, 'bad.md'), Buffer.from([0x7c, 0xff, 0x7c]))
+    await writeFile(join(directory, 'bom.md'), `\uFEFF| a | b |\n| - | - |\n| 1 | 2 |\n`, 'utf8')
+
+    const strict = await readDocuments(['big.md'], { root: directory, limits: { maxBytes: 10 } })
+    assert.deepEqual(strict.documents, [])
+    assert.equal(strict.failures[0].ruleId, 'limit-exceeded')
+    assert.match(strict.failures[0].message, /maxBytes limit of 10/)
+
+    const decoded = await readDocuments(['bad.md', 'missing.md'], { root: directory })
+    assert.deepEqual(decoded.failures.map((failure) => failure.ruleId), ['input-not-utf8', 'input-unreadable'])
+    assert.deepEqual(decoded.failures.map((failure) => failure.file), ['bad.md', 'missing.md'])
+
+    const bom = await readDocuments(['bom.md'], { root: directory })
+    assert.deepEqual(bom.failures, [])
+    assert.equal(parseTables(bom.documents[0].text).tables.length, 1)
+
+    await assert.rejects(
+      readDocuments(['bom.md', 'big.md'], { root: directory, limits: { maxFiles: 1 } }),
+      (error) => error instanceof LimitExceeded && error.limit === 'maxFiles',
+    )
+
+    const { report } = validateDocuments(bom.documents, { failures: decoded.failures })
+    assert.equal(report.status, 'incomplete')
+    assert.equal(report.summary.files, 3)
+    assert.equal(report.summary.filesRead, 1)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test('an invalid configuration is a usage error, not a default', () => {
