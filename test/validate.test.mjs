@@ -265,6 +265,29 @@ test('reading names each input failure without ever walking a directory', async 
   }
 })
 
+test('bytes that are not UTF-8 are reported even when the file also contains U+FFFD', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    const replacement = String.fromCharCode(0xfffd)
+    const head = Buffer.from('| a | b |\n| - | - |\n| 1 | ', 'utf8')
+    const tail = Buffer.from(` ${replacement} |\n`, 'utf8')
+    await writeFile(join(directory, 'mixed.md'), Buffer.concat([head, Buffer.from([0xff]), tail]))
+    await writeFile(join(directory, 'literal.md'), Buffer.concat([head, tail]))
+
+    const mixed = await readDocuments([join(directory, 'mixed.md')], { root: directory })
+    assert.deepEqual(mixed.documents, [])
+    assert.deepEqual(mixed.failures.map((failure) => failure.ruleId), ['input-not-utf8'])
+    assert.equal(validateDocuments(mixed.documents, { failures: mixed.failures }).report.status, 'incomplete')
+
+    const literal = await readDocuments([join(directory, 'literal.md')], { root: directory })
+    assert.deepEqual(literal.failures, [])
+    assert.ok(literal.documents[0].text.includes(replacement), 'a literal U+FFFD is kept as content')
+    assert.equal(validateDocuments(literal.documents).report.status, 'pass')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('an invalid configuration is a usage error, not a default', () => {
   assert.throws(() => parseConfig({ schemaVersion: '2' }), /schemaVersion/)
   assert.throws(() => parseConfig({ schemaVersion: '1', unknown: 1 }), /Unknown configuration key/)

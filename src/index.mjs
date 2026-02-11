@@ -504,16 +504,36 @@ export function validateDocuments(documents, options = {}) {
 }
 
 const NUL = String.fromCharCode(0)
-const REPLACEMENT_CHARACTER = String.fromCharCode(0xfffd)
-const REPLACEMENT_BYTES = Buffer.from(REPLACEMENT_CHARACTER, 'utf8')
+
+/**
+ * A strict UTF-8 decoder.
+ *
+ * `fatal` is what makes the honesty promise hold: invalid bytes throw instead
+ * of being replaced by U+FFFD, so a file that legitimately contains U+FFFD is
+ * still read exactly, and a file whose bytes cannot be decoded is never read as
+ * if they could. `ignoreBOM` keeps a leading U+FEFF in the text so it is
+ * stripped in one place below.
+ */
+const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+
+/** Decode bytes as UTF-8 exactly, or `null` when they are not UTF-8. */
+function decodeUtf8(bytes) {
+  try {
+    return UTF8_STRICT.decode(bytes)
+  } catch {
+    return null
+  }
+}
 
 /**
  * Read the given paths, in the given order.
  *
  * The tool never walks a directory: every input is named explicitly, so nothing
  * about the report depends on filesystem enumeration order. A file that cannot
- * be read, is not valid UTF-8, or carries NUL bytes becomes a failure the
- * caller reports as `incomplete` -- never a quietly skipped input.
+ * be read, cannot be decoded as UTF-8, or carries NUL bytes becomes a failure
+ * the caller reports as `incomplete` -- never a quietly skipped input. Decoding
+ * is strict, so a document that genuinely contains U+FFFD is checked normally
+ * while one whose bytes are not UTF-8 is always reported.
  */
 export async function readDocuments(paths, options = {}) {
   const limits = { ...DEFAULT_LIMITS, ...(options.limits ?? {}) }
@@ -538,22 +558,21 @@ export async function readDocuments(paths, options = {}) {
         })
         continue
       }
-      const bytes = await readFile(absolute)
-      let text = bytes.toString('utf8')
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
+      const decoded = decodeUtf8(await readFile(absolute))
+      if (decoded === null) {
+        failures.push({
+          file,
+          ruleId: 'input-not-utf8',
+          message: 'This file is not valid UTF-8, so its contents could not be read exactly.',
+        })
+        continue
+      }
+      const text = decoded.charCodeAt(0) === 0xfeff ? decoded.slice(1) : decoded
       if (text.includes(NUL)) {
         failures.push({
           file,
           ruleId: 'input-not-text',
           message: 'This file contains NUL bytes, so it is not a Markdown document.',
-        })
-        continue
-      }
-      if (text.includes(REPLACEMENT_CHARACTER) && !bytes.includes(REPLACEMENT_BYTES)) {
-        failures.push({
-          file,
-          ruleId: 'input-not-utf8',
-          message: 'This file is not valid UTF-8, so its contents could not be read exactly.',
         })
         continue
       }

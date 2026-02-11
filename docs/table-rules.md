@@ -68,6 +68,10 @@ changelog.
 Only `error` findings fail a run. The four input rules also make the run
 `incomplete`, which exits `2` whatever else was found.
 
+Decoding is strict. Input bytes go through a fatal UTF-8 decoder, so bytes that
+cannot be decoded are always `input-not-utf8`, and a document that legitimately
+contains U+FFFD is checked like any other document.
+
 Content constraints apply to a cell's **content**: trimmed, with `\|`
 unescaped. `required` governs emptiness; `allowedValues`, `pattern`, `maxLength`
 and `unique` are only applied to cells that are not empty, so an empty cell

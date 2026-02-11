@@ -142,6 +142,29 @@ test('an input that is not text is incomplete, never a pass', async () => {
   }
 })
 
+test('a file whose bytes are not UTF-8 is incomplete even when it also contains U+FFFD', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    const path = join(directory, 'mixed.md')
+    const previews = join(directory, 'preview')
+    await writeFile(path, Buffer.concat([
+      Buffer.from('| a | b |\n| - | - |\n| 1 | ', 'utf8'),
+      Buffer.from([0xff]),
+      Buffer.from(` ${String.fromCharCode(0xfffd)} |\n`, 'utf8'),
+    ]))
+    const result = await cli(['--json', '--root', directory, '--preview-dir', previews, path])
+    assert.equal(result.code, 2)
+    const report = JSON.parse(result.stdout)
+    assert.equal(report.status, 'incomplete')
+    assert.equal(report.summary.filesRead, 0)
+    assert.equal(report.findings[0].ruleId, 'input-not-utf8')
+    assert.doesNotMatch(result.stderr, /preview written/)
+    await assert.rejects(readFile(join(previews, 'mixed.md'), 'utf8'))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('an invalid configuration exits 2 with an empty stdout', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
   try {

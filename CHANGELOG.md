@@ -24,4 +24,12 @@ All notable changes to this project are documented in this file.
 - the rule catalog, configuration reference, limits and determinism guarantee in
   `docs/table-rules.md`.
 
+### Fixed
+
+- an input whose bytes are not UTF-8 is now always reported as `input-not-utf8`
+  with status `incomplete` and exit `2`. Decoding is strict instead of inferred
+  from the decoded text, so a file that carries undecodable bytes *and* a
+  literal U+FFFD is no longer reported as a pass, and a file that legitimately
+  contains U+FFFD is still checked normally.
+
 No release has been published.
