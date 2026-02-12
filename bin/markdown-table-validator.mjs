@@ -2,6 +2,7 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 
 import {
   LimitExceeded,
@@ -10,6 +11,15 @@ import {
   readDocuments,
   validateDocuments,
 } from '../src/index.mjs'
+
+/**
+ * The one clock in the tool.
+ *
+ * `timeLimitMs` is enforced against an injected clock so the library stays
+ * deterministic; the command line injects the process monotonic clock here, and
+ * the budget can only ever turn a run into an explicit `limit-exceeded`.
+ */
+const clock = () => performance.now()
 
 const HELP = `markdown-table-validator
 
@@ -104,7 +114,7 @@ async function main(argv) {
       root: options.root ?? undefined,
       limits: config?.limits,
     })
-    const { report, previews } = validateDocuments(documents, { config, failures })
+    const { report, previews } = validateDocuments(documents, { config, failures, clock })
 
     if (options.previewDir !== null) await writePreviews(previews, documents, options.previewDir, root)
 

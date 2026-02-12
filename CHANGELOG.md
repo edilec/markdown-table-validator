@@ -31,5 +31,8 @@ All notable changes to this project are documented in this file.
   from the decoded text, so a file that carries undecodable bytes *and* a
   literal U+FFFD is no longer reported as a pass, and a file that legitimately
   contains U+FFFD is still checked normally.
+- the command line now injects a clock, so the documented `timeLimitMs` budget
+  is actually enforced there instead of being accepted and ignored. Exceeding it
+  reports `limit-exceeded` with status `incomplete` and exit `2`.
 
 No release has been published.

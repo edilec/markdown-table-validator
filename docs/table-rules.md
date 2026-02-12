@@ -113,14 +113,15 @@ never a pass.
 | `maxTables` | 500 | Tables in a single file |
 | `maxRowsPerTable` | 5000 | Data rows of a single table |
 | `maxColumns` | 200 | Columns of a single table |
-| `timeLimitMs` | 10000 | Wall-clock budget for reading one file |
+| `timeLimitMs` | 10000 | Elapsed-time budget for parsing one file |
 
 The reader is line-based and has no recursive descent, so there is no recursion
 depth to bound: the deepest nesting it tracks is a fenced code block, which is a
 single flag. `timeLimitMs` is measured with a clock the caller injects
-(`validateDocuments(documents, { clock })`); the command line uses the system
-clock, and the budget can only ever turn a run into an explicit
-`limit-exceeded`, never change a finding.
+(`validateDocuments(documents, { clock })`), so the library reads no clock of
+its own; the command line injects the process monotonic clock
+(`performance.now`). The budget can only ever turn a run into an explicit
+`limit-exceeded` with status `incomplete`, never change a finding.
 
 ## The formatting preview
 
@@ -149,7 +150,8 @@ Running the tool twice over identical inputs produces byte-identical stdout.
 - Documents are processed in the order they are named. No directory is ever
   walked, so filesystem enumeration order cannot reach the report.
 - No wall-clock time, random value or hash iteration order affects any output.
-  The only clock is the injectable `timeLimitMs` budget described above.
+  The only clock is the injectable `timeLimitMs` budget described above, and it
+  can only add a `limit-exceeded` finding; it never changes another finding.
 - Nothing is fetched. There is no network access, telemetry or provider call.
 - Evidence excerpts are bounded to 120 code points, and control characters,
   U+2028 and U+2029 are written as escape text, so one finding is always one

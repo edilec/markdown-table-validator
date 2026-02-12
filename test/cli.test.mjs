@@ -165,6 +165,31 @@ test('a file whose bytes are not UTF-8 is incomplete even when it also contains 
   }
 })
 
+test('the command line enforces timeLimitMs against a real clock', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    const document = join(directory, 'big.md')
+    const policy = join(directory, 'policy.json')
+    const lines = []
+    for (let index = 0; index < 20000; index += 1) lines.push(`prose | line - ${index}`)
+    await writeFile(document, `${lines.join('\n')}\n`, 'utf8')
+    await writeFile(policy, JSON.stringify({ schemaVersion: '1', limits: { timeLimitMs: 1 } }), 'utf8')
+
+    const result = await cli(['--json', '--config', policy, '--root', directory, document])
+    assert.equal(result.code, 2)
+    const report = JSON.parse(result.stdout)
+    assert.equal(report.status, 'incomplete')
+    assert.equal(report.findings[0].ruleId, 'limit-exceeded')
+    assert.match(report.findings[0].message, /timeLimitMs/)
+
+    const generous = await cli(['--json', '--root', directory, document])
+    assert.equal(generous.code, 0)
+    assert.equal(JSON.parse(generous.stdout).status, 'pass')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('an invalid configuration exits 2 with an empty stdout', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
   try {
