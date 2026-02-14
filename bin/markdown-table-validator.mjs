@@ -37,7 +37,9 @@ Options:
   -h, --help          Show this help
 
 Inputs are read in the order given; no directory is ever walked, so the report
-never depends on filesystem enumeration order. The preview is a derived copy: an
+never depends on filesystem enumeration order. An input path is always resolved
+against the current working directory: --root only changes the paths written
+into the report. The preview is a derived copy: an
 input file is never rewritten, and a table that cannot be reformatted without
 risking its content is copied through untouched and reported.
 

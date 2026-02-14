@@ -534,10 +534,16 @@ function decodeUtf8(bytes) {
  * the caller reports as `incomplete` -- never a quietly skipped input. Decoding
  * is strict, so a document that genuinely contains U+FFFD is checked normally
  * while one whose bytes are not UTF-8 is always reported.
+ *
+ * The two directories do different jobs and never trade places. `cwd` (default
+ * `process.cwd()`) resolves a relative input path; `root` (default `cwd`) is
+ * only the directory reported paths are made relative to. Naming a `root` can
+ * therefore never change which file is read.
  */
 export async function readDocuments(paths, options = {}) {
   const limits = { ...DEFAULT_LIMITS, ...(options.limits ?? {}) }
-  const root = resolve(options.root ?? process.cwd())
+  const cwd = resolve(options.cwd ?? process.cwd())
+  const root = resolve(options.root ?? cwd)
   if (paths.length > limits.maxFiles) {
     throw new LimitExceeded('maxFiles', limits.maxFiles, paths.length)
   }
@@ -545,7 +551,7 @@ export async function readDocuments(paths, options = {}) {
   const documents = []
   const failures = []
   for (const path of paths) {
-    const absolute = resolve(root, path)
+    const absolute = resolve(cwd, path)
     const file = relative(root, absolute).split(sep).join('/') || path
     try {
       const stats = await stat(absolute)

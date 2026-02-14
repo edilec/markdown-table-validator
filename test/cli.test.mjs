@@ -117,6 +117,15 @@ test('the preview refuses to write over the input it was derived from', async ()
   }
 })
 
+test('--root only changes reported paths, never how an input is resolved', async () => {
+  const result = await cli(['--json', '--root', join(ROOT, 'examples'), 'examples/broken.md'])
+  assert.equal(result.code, 1)
+  const report = JSON.parse(result.stdout)
+  assert.equal(report.status, 'fail')
+  assert.equal(report.summary.filesRead, 1)
+  assert.deepEqual([...new Set(report.findings.map((item) => item.location.file))], ['broken.md'])
+})
+
 test('an unreadable input is incomplete and exits 2', async () => {
   const result = await cli(['--json', 'examples/does-not-exist.md'])
   assert.equal(result.code, 2)

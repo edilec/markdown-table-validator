@@ -34,5 +34,10 @@ All notable changes to this project are documented in this file.
 - the command line now injects a clock, so the documented `timeLimitMs` budget
   is actually enforced there instead of being accepted and ignored. Exceeding it
   reports `limit-exceeded` with status `incomplete` and exit `2`.
+- `--root` now does only what it is documented to do. It sets the directory
+  reported paths are relative to; input paths are resolved against the working
+  directory, so naming a root no longer turns a readable file into
+  `input-unreadable`. `readDocuments` takes the two directories separately as
+  `cwd` (resolution) and `root` (reporting).
 
 No release has been published.

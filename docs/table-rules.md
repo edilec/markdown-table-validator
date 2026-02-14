@@ -149,6 +149,10 @@ Running the tool twice over identical inputs produces byte-identical stdout.
   would make the output machine-dependent.
 - Documents are processed in the order they are named. No directory is ever
   walked, so filesystem enumeration order cannot reach the report.
+- Reported paths are made relative to `--root` (default: the working directory)
+  and always use `/` as the separator, so the same run reports the same paths on
+  every platform. A relative input path is resolved against the working
+  directory, so the reporting root can never change which file is read.
 - No wall-clock time, random value or hash iteration order affects any output.
   The only clock is the injectable `timeLimitMs` budget described above, and it
   can only add a `limit-exceeded` finding; it never changes another finding.

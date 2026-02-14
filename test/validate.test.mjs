@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 import {
   LimitExceeded,
@@ -238,21 +238,21 @@ test('reading names each input failure without ever walking a directory', async 
     await writeFile(join(directory, 'bad.md'), Buffer.from([0x7c, 0xff, 0x7c]))
     await writeFile(join(directory, 'bom.md'), `\uFEFF| a | b |\n| - | - |\n| 1 | 2 |\n`, 'utf8')
 
-    const strict = await readDocuments(['big.md'], { root: directory, limits: { maxBytes: 10 } })
+    const strict = await readDocuments(['big.md'], { cwd: directory, limits: { maxBytes: 10 } })
     assert.deepEqual(strict.documents, [])
     assert.equal(strict.failures[0].ruleId, 'limit-exceeded')
     assert.match(strict.failures[0].message, /maxBytes limit of 10/)
 
-    const decoded = await readDocuments(['bad.md', 'missing.md'], { root: directory })
+    const decoded = await readDocuments(['bad.md', 'missing.md'], { cwd: directory })
     assert.deepEqual(decoded.failures.map((failure) => failure.ruleId), ['input-not-utf8', 'input-unreadable'])
     assert.deepEqual(decoded.failures.map((failure) => failure.file), ['bad.md', 'missing.md'])
 
-    const bom = await readDocuments(['bom.md'], { root: directory })
+    const bom = await readDocuments(['bom.md'], { cwd: directory })
     assert.deepEqual(bom.failures, [])
     assert.equal(parseTables(bom.documents[0].text).tables.length, 1)
 
     await assert.rejects(
-      readDocuments(['bom.md', 'big.md'], { root: directory, limits: { maxFiles: 1 } }),
+      readDocuments(['bom.md', 'big.md'], { cwd: directory, limits: { maxFiles: 1 } }),
       (error) => error instanceof LimitExceeded && error.limit === 'maxFiles',
     )
 
@@ -283,6 +283,27 @@ test('bytes that are not UTF-8 are reported even when the file also contains U+F
     assert.deepEqual(literal.failures, [])
     assert.ok(literal.documents[0].text.includes(replacement), 'a literal U+FFFD is kept as content')
     assert.equal(validateDocuments(literal.documents).report.status, 'pass')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('the reporting root never changes which file is read', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'markdown-table-validator-'))
+  try {
+    const workspace = join(directory, 'workspace')
+    await mkdir(workspace)
+    await writeFile(join(workspace, 'doc.md'), '| a | b |\n| - | - |\n| 1 | 2 |\n', 'utf8')
+
+    const reported = await readDocuments(['doc.md'], { cwd: workspace, root: directory })
+    assert.deepEqual(reported.failures, [])
+    assert.equal(reported.documents[0].absolute, join(workspace, 'doc.md'))
+    assert.equal(reported.documents[0].file, `${basename(workspace)}/doc.md`)
+
+    const plain = await readDocuments(['doc.md'], { cwd: workspace })
+    assert.deepEqual(plain.failures, [])
+    assert.equal(plain.documents[0].file, 'doc.md')
+    assert.equal(plain.documents[0].absolute, reported.documents[0].absolute)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

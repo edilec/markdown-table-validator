@@ -68,7 +68,9 @@ node bin/markdown-table-validator.mjs --config examples/table-policy.json exampl
 ## Inputs
 
 - **Markdown files**, named explicitly on the command line. No directory is ever
-  walked, so nothing in the report depends on filesystem enumeration order.
+  walked, so nothing in the report depends on filesystem enumeration order. A
+  relative input path is resolved against the working directory; `--root`
+  changes only the paths written into the report, never which file is read.
 - **A configuration file** (optional). It declares `limits`, `requiredColumns`
   and per-column constraints: `required`, `allowedValues`, `pattern`,
   `maxLength`, `unique` and `alignment`. Columns are matched by their exact
