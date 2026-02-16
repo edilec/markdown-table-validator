@@ -160,3 +160,12 @@ Running the tool twice over identical inputs produces byte-identical stdout.
 - Evidence excerpts are bounded to 120 code points, and control characters,
   U+2028 and U+2029 are written as escape text, so one finding is always one
   line and an excerpt cannot be mistaken for a directive.
+- A configuration that will not parse is reported by its offset — position, line
+  and column — and never by the text it failed on. V8 reports a parse failure
+  two ways and one of them quotes the input back, `Unexpected token 'A',
+  "AKIAIOSFODNN7EXAMPLE" is not valid JSON`, which reproduces the first ten
+  characters of the file, or the whole file when it is shorter than that. A
+  configuration short enough to be nothing but a credential would otherwise be
+  printed in full to stderr, on the one path an unparseable file is guaranteed
+  to take. A failure to *read* the file is reported separately and still names
+  the syscall.

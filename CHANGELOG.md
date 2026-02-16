@@ -26,6 +26,18 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- the `--config` diagnostic no longer republishes the configuration it could not
+  parse. V8 reports a parse failure two ways, and one of them quotes the input
+  back -- `Unexpected token 'A', "AKIAIOSFODNN7EXAMPLE" is not valid JSON` --
+  which reproduces the first ten characters of the file, or the whole file when
+  it is shorter than that. The command line interpolated that message whole onto
+  stderr, so a configuration short enough to be nothing but a credential was
+  printed in full. `parseFailureDetail` in `src/index.mjs` now keeps the offset,
+  line and column and drops the quoted half, and the read failure is caught
+  separately so an ENOENT still names the syscall.
+  `test/parse-failure.test.mjs` plants the canary through the real binary and
+  asserts it is absent from stdout, from stderr and from every prefix of it down
+  to eight characters, because V8 quotes only ten.
 - an input whose bytes are not UTF-8 is now always reported as `input-not-utf8`
   with status `incomplete` and exit `2`. Decoding is strict instead of inferred
   from the decoded text, so a file that carries undecodable bytes *and* a

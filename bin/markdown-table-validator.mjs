@@ -8,6 +8,7 @@ import {
   LimitExceeded,
   formatReport,
   parseConfig,
+  parseFailureDetail,
   readDocuments,
   validateDocuments,
 } from '../src/index.mjs'
@@ -73,12 +74,25 @@ function parseArguments(argv) {
   return options
 }
 
+/**
+ * The read and the parse fail separately on purpose. A filesystem error
+ * describes the caller's own argument, but a parse error describes the file's
+ * contents -- V8 quotes the input back in one of its two message shapes -- and
+ * that must not reach stderr. `parseFailureDetail` keeps the offset and drops
+ * the quoted half.
+ */
 async function loadConfig(path) {
-  let parsed
+  let raw
   try {
-    parsed = JSON.parse(await readFile(resolve(path), 'utf8'))
+    raw = await readFile(resolve(path), 'utf8')
   } catch (error) {
     throw new Error(`Could not read configuration: ${error.message}`)
+  }
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`The configuration is not valid JSON: ${parseFailureDetail(error)}.`)
   }
   return parseConfig(parsed)
 }
