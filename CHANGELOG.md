@@ -46,6 +46,25 @@ All notable changes to this project are documented in this file.
 - the command line now injects a clock, so the documented `timeLimitMs` budget
   is actually enforced there instead of being accepted and ignored. Exceeding it
   reports `limit-exceeded` with status `incomplete` and exit `2`.
+- `--preview-dir` no longer writes outside the directory it names, and no longer
+  destroys what it was reading. Three separate holes were open at once, and the
+  single string comparison that stood there closed none of them: a symbolic link
+  at the destination was followed, so a preview overwrote a file outside the
+  tree -- or created one, when the link pointed at a path that did not exist
+  yet; a symlinked `--preview-dir`, or a symlinked directory inside it, took
+  every preview with it, and `mkdir(..., {recursive: true})` created those
+  directories outside the tree before anything was checked; and a hard link to
+  an input shares no path with it, so the preview of a document was written back
+  over the document itself. Both of the last two exited `1` with
+  `preview written:` on stderr. `assertWritableDestination` in
+  `src/write-guard.mjs` now refuses a link on sight with `lstat`, resolves the
+  parent before comparing it with the real preview directory, and compares
+  device and inode against every input. Each directory is created inside one
+  already known to be real, so the check happens before anything is created.
+  A refused destination is a configuration error: exit `2`, empty stdout.
+  `test/write-guard.test.mjs` pins one case per hole and the destinations that
+  must keep working, because a guard that refuses everything passes a data-loss
+  test while making the option useless.
 - `--root` now does only what it is documented to do. It sets the directory
   reported paths are relative to; input paths are resolved against the working
   directory, so naming a root no longer turns a readable file into

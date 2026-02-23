@@ -110,7 +110,7 @@ test('the preview refuses to write over the input it was derived from', async ()
     const result = await cli(['--root', directory, '--preview-dir', directory, path])
     assert.equal(result.code, 2)
     assert.equal(result.stdout, '')
-    assert.match(result.stderr, /Refusing to overwrite the input file doc\.md/)
+    assert.match(result.stderr, /--preview-dir is the same file as an input/)
     assert.equal(await readFile(path, 'utf8'), source)
   } finally {
     await rm(directory, { recursive: true, force: true })

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { performance } from 'node:perf_hooks'
 
 import {
@@ -12,6 +12,7 @@ import {
   readDocuments,
   validateDocuments,
 } from '../src/index.mjs'
+import { DestinationError, assertWritableDestination } from '../src/write-guard.mjs'
 
 /**
  * The one clock in the tool.
@@ -43,6 +44,12 @@ against the current working directory: --root only changes the paths written
 into the report. The preview is a derived copy: an
 input file is never rewritten, and a table that cannot be reformatted without
 risking its content is copied through untouched and reported.
+
+Every preview is written under the real --preview-dir. A symbolic link on the
+way to a destination, or at the destination itself, is refused rather than
+followed, as is a destination that is the same file as an input -- a hard link
+included. A refused destination is a configuration error: exit 2, empty stdout,
+and nothing written.
 
 Exit codes:
   0  every table satisfied the checks
@@ -97,17 +104,94 @@ async function loadConfig(path) {
   return parseConfig(parsed)
 }
 
-async function writePreviews(previews, documents, previewDir, root) {
-  const byFile = new Map(documents.map((document) => [document.file, document.absolute]))
+/**
+ * Open the directory the caller named, and refuse a link standing in for it.
+ *
+ * `--preview-dir` is the root every preview is written under, so it is checked
+ * the way a destination is: a symbolic link here would put every preview
+ * wherever the link points, which is not the directory the caller named. The
+ * real path is returned, and every later comparison is made against it.
+ */
+async function openPreviewRoot(previewDir) {
   const target = resolve(previewDir)
-  for (const preview of previews) {
-    const destination = resolve(target, preview.file)
-    if (destination === byFile.get(preview.file)) {
-      throw new Error(`Refusing to overwrite the input file ${preview.file}; choose a --preview-dir outside ${root}`)
+  let existing = null
+  try {
+    existing = await lstat(target)
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw new DestinationError(`--preview-dir could not be inspected: ${error.code ?? 'unknown error'}`)
     }
-    await mkdir(dirname(destination), { recursive: true })
-    await writeFile(destination, preview.text, 'utf8')
-    process.stderr.write(`preview written: ${destination}\n`)
+  }
+  if (existing !== null && existing.isSymbolicLink()) {
+    throw new DestinationError(
+      '--preview-dir is a symbolic link. Every preview would be written wherever the link '
+      + 'points, which is not the directory you named, so it is refused. Name the real directory.',
+    )
+  }
+  if (existing !== null && !existing.isDirectory()) {
+    throw new DestinationError('--preview-dir exists and is not a directory.')
+  }
+  if (existing === null) await mkdir(target, { recursive: true })
+  return realpath(target)
+}
+
+/**
+ * Create the directories a preview needs without ever following a link.
+ *
+ * `mkdir(path, {recursive: true})` walks straight through a symlinked
+ * component, so a link planted inside the preview directory creates real
+ * directories outside it before any check has run -- the write is refused
+ * afterwards and those directories stay. Each component is inspected with
+ * `lstat` instead, and created only inside a directory already known to be a
+ * real one.
+ */
+async function makeDirectoryWithin(base, directory) {
+  const inside = relative(base, directory)
+  if (inside === '..' || inside.startsWith(`..${sep}`) || inside.startsWith(sep)) {
+    throw new DestinationError(
+      `--preview-dir would place a preview at ${directory}, which is outside ${base}. `
+      + 'An input above the reporting root does not widen where previews are written.',
+    )
+  }
+  let current = base
+  for (const part of inside.split(sep)) {
+    if (part === '') continue
+    current = join(current, part)
+    let existing = null
+    try {
+      existing = await lstat(current)
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw new DestinationError(`${current} could not be inspected: ${error.code ?? 'unknown error'}`)
+      }
+    }
+    if (existing === null) {
+      await mkdir(current)
+      continue
+    }
+    if (existing.isSymbolicLink()) {
+      throw new DestinationError(`${current} is a symbolic link; a preview is never written through one.`)
+    }
+    if (!existing.isDirectory()) {
+      throw new DestinationError(`${current} exists and is not a directory.`)
+    }
+  }
+}
+
+/**
+ * Write the previews, after proving each destination is a file this tool may
+ * create or replace. The guard runs before the directory is created and before
+ * anything is opened, because both of those acts follow a link.
+ */
+async function writePreviews(previews, documents, previewDir) {
+  const base = await openPreviewRoot(previewDir)
+  const inputs = documents.map((document) => document.absolute)
+  for (const preview of previews) {
+    const destination = resolve(base, preview.file)
+    await makeDirectoryWithin(base, dirname(destination))
+    const target = await assertWritableDestination(destination, { inputs, root: base, label: '--preview-dir' })
+    await writeFile(target, preview.text, 'utf8')
+    process.stderr.write(`preview written: ${target}\n`)
   }
 }
 
@@ -126,13 +210,13 @@ async function main(argv) {
 
   try {
     const config = options.config === null ? undefined : await loadConfig(options.config)
-    const { root, documents, failures } = await readDocuments(options.files, {
+    const { documents, failures } = await readDocuments(options.files, {
       root: options.root ?? undefined,
       limits: config?.limits,
     })
     const { report, previews } = validateDocuments(documents, { config, failures, clock })
 
-    if (options.previewDir !== null) await writePreviews(previews, documents, options.previewDir, root)
+    if (options.previewDir !== null) await writePreviews(previews, documents, options.previewDir)
 
     process.stdout.write(options.json ? `${JSON.stringify(report, null, 2)}\n` : formatReport(report))
     if (report.status === 'incomplete') return 2
