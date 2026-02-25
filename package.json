@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "node --check src/index.mjs && node --check src/parse.mjs && node --check src/format.mjs && node --check src/write-guard.mjs && node --check bin/markdown-table-validator.mjs && node --check test/parse.test.mjs && node --check test/validate.test.mjs && node --check test/cli.test.mjs && node --check test/parse-failure.test.mjs",
+    "lint": "node --check src/index.mjs && node --check src/parse.mjs && node --check src/format.mjs && node --check src/write-guard.mjs && node --check bin/markdown-table-validator.mjs && node --check test/parse.test.mjs && node --check test/validate.test.mjs && node --check test/cli.test.mjs && node --check test/parse-failure.test.mjs && node --check test/write-guard.test.mjs",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
     "example": "node bin/markdown-table-validator.mjs --config examples/table-policy.json examples/clean.md",
