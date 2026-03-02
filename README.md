@@ -113,6 +113,22 @@ written. Before a table is reformatted the result is parsed again and every
 cell, row and alignment must come back identical; a table that fails that check
 is copied through untouched and reported as `preview-unavailable`.
 
+### Where a preview may be written
+
+Every preview lands under the real `--preview-dir`, and the destination is
+checked before any directory is created and before anything is opened. Three
+separate things are refused, because no one check catches the others:
+
+| Refused | Why |
+| :--- | :--- |
+| A symbolic link at the destination | Writing through it puts the preview wherever the link points, which is not the path you named. It is refused on sight, never resolved. |
+| A symbolic link on the way to it, `--preview-dir` itself included | A link leaving the directory takes the preview with it. The parent is resolved and compared, and each directory is created only inside a real one. |
+| A destination that is the same file as an input | A hard link shares no path with the input and has no target to resolve, so only the device and inode show that it is one file. This tool never rewrites what it reads. |
+
+A refused destination is a configuration error: exit `2`, empty stdout, nothing
+written, and the reason on stderr. A preview directory that merely sits under a
+symlinked ancestor -- a system temporary directory, typically -- is fine.
+
 ## Exit codes
 
 | Code | Meaning |
