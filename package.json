@@ -1,0 +1,51 @@
+{
+  "name": "markdown-table-validator",
+  "version": "0.1.0",
+  "description": "Validate Markdown tables for shape, escaping, alignment and predictable rendering.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "node --check src/index.mjs && node --check src/parse.mjs && node --check src/format.mjs && node --check src/write-guard.mjs && node --check bin/markdown-table-validator.mjs && node --check test/parse.test.mjs && node --check test/validate.test.mjs && node --check test/cli.test.mjs && node --check test/parse-failure.test.mjs && node --check test/write-guard.test.mjs",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "example": "node bin/markdown-table-validator.mjs --config examples/table-policy.json examples/clean.md",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run lint && npm test && npm run example && npm run pack:check"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edilec/markdown-table-validator.git"
+  },
+  "bin": {
+    "markdown-table-validator": "./bin/markdown-table-validator.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "markdown",
+    "gfm",
+    "table",
+    "validation",
+    "documentation",
+    "lint",
+    "cli"
+  ],
+  "author": "Edilec Private Limited",
+  "bugs": {
+    "url": "https://github.com/edilec/markdown-table-validator/issues"
+  },
+  "homepage": "https://github.com/edilec/markdown-table-validator#readme"
+}

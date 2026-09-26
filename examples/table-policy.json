@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "requiredColumns": ["Name", "Status"],
+  "columns": {
+    "Name": {
+      "required": true,
+      "unique": true,
+      "pattern": "^[A-Z][A-Za-z0-9 ]*$"
+    },
+    "Status": {
+      "required": true,
+      "allowedValues": ["stable", "beta", "deprecated"],
+      "alignment": "center"
+    },
+    "Separator": {
+      "maxLength": 12
+    },
+    "Notes": {
+      "maxLength": 60
+    }
+  }
+}
