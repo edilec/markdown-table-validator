@@ -168,6 +168,10 @@ This tool **cannot** conclude:
 It also does not fix anything. The preview is a separate file you can read,
 diff and copy from; nothing is written back over your documents.
 
+For link and anchor integrity in the same documentation workflow, see Edilec's
+[Docs Link Integrity Checker worked example](https://edilec.com/open-source/docs-link-integrity-checker/).
+That is a separate tool; it does not validate table structure.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
