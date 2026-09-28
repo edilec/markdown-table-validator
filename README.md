@@ -24,8 +24,10 @@ column that has to change.
 Node 22 or newer. No runtime dependencies and no build step.
 
 ```sh
-npm install markdown-table-validator
+npm install github:edilec/markdown-table-validator
 ```
+
+This installs the public GitHub source; `markdown-table-validator` is not published to npm.
 
 Or run it from a checkout:
 
@@ -37,16 +39,16 @@ node bin/markdown-table-validator.mjs --help
 
 ```sh
 # check one or more documents
-markdown-table-validator docs/api.md docs/cli.md
+npx markdown-table-validator docs/api.md docs/cli.md
 
 # apply content constraints from a policy file
-markdown-table-validator --config examples/table-policy.json examples/clean.md
+npx markdown-table-validator --config examples/table-policy.json examples/clean.md
 
 # machine-readable report, stdout carries nothing else
-markdown-table-validator --json --config examples/table-policy.json docs/api.md
+npx markdown-table-validator --json --config examples/table-policy.json docs/api.md
 
 # write the derived formatting preview into a directory of its own
-markdown-table-validator --preview-dir build/preview docs/api.md
+npx markdown-table-validator --preview-dir build/preview docs/api.md
 ```
 
 | Option | Meaning |
